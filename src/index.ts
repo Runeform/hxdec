@@ -452,6 +452,55 @@ const hxdec = {
         }
         return;
     },
+    digestCard: (line: string) => { //split at first space
+        const splitIndex = line.indexOf(" ");
+        let name = line.substring(splitIndex + 1).trim();
+        const newCard = {
+            name,
+            qty: Number(line.substring(0, splitIndex).trim().replace("x", "")),
+            set: "",
+            foil: "",
+            cat: "",
+            tags: "",
+            collectorNumber: "",
+            hxcode: "",
+            hxnumber: "",
+        } as Obj;
+        const trimValue = (property: string, start: string, end: string) => {
+            const regex = new RegExp(`\\${start}([^\\${end}]*)\\${end}`);
+            const match = name.match(regex);
+            let replaceSymbol = "";
+            if (start === "(") replaceSymbol = `::::`;
+            // get the matched value without the start and end symbols and assign it to newCard with the property name as the key
+            if (match && match[1]) {
+                newCard[property] = match[1].trim();
+                name = name.replace(regex, replaceSymbol);
+                // console.log('newCard:', newCard, match[1]);
+            }
+        }
+        trimValue("set", "(", ")");
+        trimValue("foil", "*", "*");
+        trimValue("cat", "[", "]");
+        trimValue("tags", "^", "^");
+        const nameSplit = name.split("::::");
+        name = nameSplit[0].trim();
+        if (nameSplit.length > 1) {
+            newCard.collectorNumber = nameSplit[1].trim();
+        }
+        if (newCard.set.length > 0) {
+            newCard.hxcode = hxdec.setData.find(s => s.code.toLowerCase() === newCard.set.toLowerCase())?.hxcode || null;
+        }
+        if (newCard.collectorNumber.length > 0) {
+            // if collector number is just a number, convert to hex and pad to 3 digits
+            if (/^\d+$/.test(newCard.collectorNumber)) {
+                const hxnumber = Number(newCard.collectorNumber).toString(16);
+                newCard.hxnumber = hxnumber;
+            } else {
+                newCard.hxnumber = `~${newCard.collectorNumber}~`;
+            }
+        }
+        return newCard;
+    },
     getCardData: async (cards: Obj[], properties: string[], callback: (cardInfos: Obj[]) => void) => {
         // fetch all cards from scryfall
         const batchSize = 75; // scryfall allows up to 75 identifiers per request
@@ -529,55 +578,6 @@ const hxdec = {
             await new Promise(resolve => setTimeout(resolve, delay));
         }
         return;
-    },
-    digestCard: (line: string) => { //split at first space
-        const splitIndex = line.indexOf(" ");
-        let name = line.substring(splitIndex + 1).trim();
-        const newCard = {
-            name,
-            qty: Number(line.substring(0, splitIndex).trim().replace("x", "")),
-            set: "",
-            foil: "",
-            cat: "",
-            tags: "",
-            collectorNumber: "",
-            hxcode: "",
-            hxnumber: "",
-        } as Obj;
-        const trimValue = (property: string, start: string, end: string) => {
-            const regex = new RegExp(`\\${start}([^\\${end}]*)\\${end}`);
-            const match = name.match(regex);
-            let replaceSymbol = "";
-            if (start === "(") replaceSymbol = `::::`;
-            // get the matched value without the start and end symbols and assign it to newCard with the property name as the key
-            if (match && match[1]) {
-                newCard[property] = match[1].trim();
-                name = name.replace(regex, replaceSymbol);
-                // console.log('newCard:', newCard, match[1]);
-            }
-        }
-        trimValue("set", "(", ")");
-        trimValue("foil", "*", "*");
-        trimValue("cat", "[", "]");
-        trimValue("tags", "^", "^");
-        const nameSplit = name.split("::::");
-        name = nameSplit[0].trim();
-        if (nameSplit.length > 1) {
-            newCard.collectorNumber = nameSplit[1].trim();
-        }
-        if (newCard.set.length > 0) {
-            newCard.hxcode = hxdec.setData.find(s => s.code.toLowerCase() === newCard.set.toLowerCase())?.hxcode || null;
-        }
-        if (newCard.collectorNumber.length > 0) {
-            // if collector number is just a number, convert to hex and pad to 3 digits
-            if (/^\d+$/.test(newCard.collectorNumber)) {
-                const hxnumber = Number(newCard.collectorNumber).toString(16);
-                newCard.hxnumber = hxnumber;
-            } else {
-                newCard.hxnumber = `~${newCard.collectorNumber}~`;
-            }
-        }
-        return newCard;
     },
     encoded: (list: string) => {
         console.log("hxdec.encoded: ", list);
