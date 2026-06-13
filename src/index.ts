@@ -35,7 +35,7 @@ const hxdec = {
                     // if  line doesnt start with a number followed by " " or "x ", It is not a card line.  Check to see if its a section title and then, assign  the targetSection based on the title.  If the title is "About" and it is the first line of the first section, check to see if the second line starts with "Name " and if so, capture the deck name from that line and assign it to listData.name.  If the line is not a card line or a section header, skip it.
                     if (!/^\d+x?\s/.test(line)) {
                         const titleLine = line.toLowerCase().replace(":", "");
-                        console.log(`Processing section title: ${titleLine}`);
+                        console.log(`Processing section by title: ${titleLine}`);
                         if (titleLine === "commander" || titleLine === "companion" || titleLine === "sideboard" || titleLine === "maybeboard" || titleLine === "mainboard") {
                             targetSection = titleLine;
                         }
@@ -49,13 +49,16 @@ const hxdec = {
                     } else if (sec.length < 3 && index === 0 && listData.commander.length === 0) {
                         // 1-2 separate lines with no section headerde notes commanders for some formats
                         targetSection = "commander";
+                        console.log(`Processing commanders by layout`, targetSection);
+                    } else if (index === 0) {
+                        console.log(`Processing mainboard by layout`, targetSection);
                     }
                     const newCard = hxdec.digestCard(line);
-                    if (typeof newCard.hxnumber === "undefined" || typeof newCard.hxcode === "undefined") {
+                    if (newCard.hxnumber.length === 0 || newCard.hxcode.length === 0) {
                         listData.prefetch = listData.prefetch || [];
                         listData.prefetch.push({ ...newCard, targetSection });
                         return;
-                    } else if (typeof newCard.cat !== "undefined" && newCard.cat.includes("Commander")) {
+                    } else if (newCard.cat.includes("Commander")) {
                         listData.commander = listData.commander || [];
                         listData.commander.push({ ...newCard, targetSection });
                     } else {
@@ -65,11 +68,11 @@ const hxdec = {
                 });
 
             });
-            if (typeof listData.prefetch !== "undefined") {
+            if (listData.prefetch.length > 0) {
                 hxdec.getCardData(listData.prefetch, ["set", "collector_number"], (cards: Obj[]) => {
                     cards.forEach((card: Obj) => {
                         // add each card to its target section and update the hxcode and hxnumber based on the set and collector number
-                        if (typeof card.set !== "undefined" && typeof card.collector_number !== "undefined" && typeof hxdec.setData !== "undefined") {
+                        if (card.set.length > 0 && card.collector_number.length > 0 && hxdec.setData.length > 0) {
                             card.hxcode = hxdec.setData.find(s => s.code.toLowerCase() === card.set.toLowerCase())?.hxcode || null;
                             if (card.hxcode) {
                                 const collectorNumber = card.collector_number;
@@ -114,25 +117,25 @@ const hxdec = {
                     }
                     cardString += card.hxcode;
                     cardString += card.hxnumber;
-                    if (foil && typeof card.foil !== "undefined") {
+                    if (foil && card.foil.length > 0) {
                         cardString += `*${card.foil}*`;
                     }
-                    if (tags && typeof card.tags !== "undefined") {
+                    if (tags && card.tags.length > 0) {
                         cardString += `^${card.tags}^`;
                     }
-                    if (cat && typeof card.cat !== "undefined") {
+                    if (cat && card.cat.length > 0) {
                         cardString += `[${card.cat}]`;
                     }
                     newCards += cardString;
                 });
                 return newCards;
             }
-            if (typeof listData.mainboard === "undefined" || listData.mainboard.length === 0) {
+            if (listData.mainboard.length === 0 || listData.mainboard.length === 0) {
                 hxdec.error("No mainboard cards found, cannot build HXDEC");
                 return;
             }
             // If this is a type of format that lists a commander as the first card in the mainboard section without a section header, move it to the commander section and remove it from the mainboard section
-            if (typeof listData.mainboard !== "undefined" && typeof listData.commander === "undefined") {
+            if (listData.mainboard.length > 0 && listData.commander.length === 0) {
                 // count the number of cards in the mainboard
                 let mainboardCount = 0;
                 listData.mainboard.forEach((mainboardCard: Obj) => {
@@ -145,19 +148,19 @@ const hxdec = {
                 }
             }
             let deck = `h${outputCards(listData.mainboard)}`;
-            if (typeof listData.commander !== "undefined") {
+            if (listData.commander.length > 0) {
                 deck += `k${outputCards(listData.commander)}`;
             }
-            if (typeof listData.sideboard !== "undefined") {
+            if (listData.sideboard.length > 0) {
                 deck += `s${outputCards(listData.sideboard)}`;
             }
-            if (typeof listData.maybeboard !== "undefined") {
+            if (listData.maybeboard.length > 0) {
                 deck += `m${outputCards(listData.maybeboard)}`;
             }
-            if (typeof listData.companion !== "undefined") {
+            if (listData.companion.length > 0) {
                 deck += `p${outputCards(listData.companion)}`;
             }
-            if (typeof listData.name !== "undefined") {
+            if (listData.name.length > 0) {
                 deck += `+${encodeURIComponent(listData.name)}+`;
             }
             hxdec.ready();
@@ -222,7 +225,7 @@ const hxdec = {
                     }
                     const setHx = code.substring(0, 3);
                     // if code contains * , extract the foil value and remove it from the code
-                    let foil = null;
+                    let foil = "";
                     if (code.includes("*")) {
                         const foilMatch = code.match(/\*(.*?)\*/);
                         if (foilMatch) {
@@ -231,7 +234,7 @@ const hxdec = {
                         }
                     }
                     // if code contains ^, extract the tag value and remove it from the code
-                    let tags = null;
+                    let tags = "";
                     if (code.includes("^")) {
                         const tagMatch = code.match(/\^(.*?)\^/);
                         if (tagMatch) {
@@ -240,7 +243,7 @@ const hxdec = {
                         }
                     }
                     // if code contains [ ], extract the category value and remove it from the code
-                    let category = null;
+                    let category = "";
                     if (code.includes("[")) {
                         const categoryMatch = code.match(/\[(.*?)\]/);
                         if (categoryMatch) {
@@ -257,7 +260,7 @@ const hxdec = {
                     } else if (isNaN(parseInt(number))) {
                         console.log(`Invalid collector number hex: ${numberHx} for code: ${code}`);
                     }
-                    let set = null;
+                    let set = "";
 
                     // find set in set data
                     const setInfo = hxdec.setData.find(s => s.hxcode === setHx);
@@ -265,7 +268,7 @@ const hxdec = {
                         set = setInfo.code;
                     }
 
-                    const newCard = { code, qty, set, number, foil, tags, category, targetSection } as Obj;
+                    const newCard = { name: "", code, qty, set, number, foil, tags, category, targetSection } as Obj;
 
                     cards.push(newCard);
                 });
@@ -397,10 +400,17 @@ const hxdec = {
             return;
         }
         hxdec.loading("Fetching set data from scryfall");
-        fetch("https://api.scryfall.com/sets")
+        fetch("https://api.scryfall.com/sets", {
+            headers: {
+                "Content-Type": "application/json",
+                "User-Agent": "hxdec/1.0.2",
+                "Accept": "application/json",
+            }
+        }
+        )
             .then((resp) => resp.json())
             .then((resp) => {
-                if (typeof resp.data !== "undefined" && resp.data.length > 0) {
+                if (resp.data && resp.data.length > 0) {
                     const sets = [] as Obj[];
                     const initSetsData = resp.data;
                     // sort initSetsData by release date ascending
@@ -469,7 +479,9 @@ const hxdec = {
             fetch("https://api.scryfall.com/cards/collection", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "User-Agent": "hxdec/1.0.2",
+                    "Accept": "application/json",
                 },
                 body: JSON.stringify({ identifiers })
             })
@@ -481,14 +493,14 @@ const hxdec = {
                             // all card info has been fetched, add the card names to the cards in the decoded data
                             cards.forEach((card, index) => {
                                 let cardInfo = {} as Obj;
-                                if (typeof card.name !== "undefined" && (typeof card.set === "undefined" || typeof card.number === "undefined")) {
+                                if (card.name.length > 0 && (card.set.length === 0 || card.number.length === 0)) {
                                     cardInfo = cardInfos.find(info => info.name.toLowerCase() === card.name.toLowerCase()) || {} as Obj;
-                                } else if ((typeof card.set !== "undefined" && typeof card.number !== "undefined") && typeof card.name === "undefined") {
+                                } else if ((card.set.length > 0 && card.number.length > 0) && card.name.length === 0) {
                                     cardInfo = cardInfos.find(info => info.set.toLowerCase() === card.set.toLowerCase() && info.collector_number === String(card.number)) || {} as Obj;
                                 }
                                 if (cardInfo && Object.keys(cardInfo).length !== 0) {
                                     properties.forEach(prop => {
-                                        if (typeof cardInfo[prop] !== "undefined") {
+                                        if (cardInfo[prop].length > 0) {
                                             cards[index][prop] = cardInfo[prop];
                                         }
                                     });
@@ -552,10 +564,10 @@ const hxdec = {
         if (nameSplit.length > 1) {
             newCard.collectorNumber = nameSplit[1].trim();
         }
-        if (typeof newCard.set !== "undefined") {
+        if (newCard.set.length > 0) {
             newCard.hxcode = hxdec.setData.find(s => s.code.toLowerCase() === newCard.set.toLowerCase())?.hxcode || null;
         }
-        if (typeof newCard.collectorNumber !== "undefined") {
+        if (newCard.collectorNumber.length > 0) {
             // if collector number is just a number, convert to hex and pad to 3 digits
             if (/^\d+$/.test(newCard.collectorNumber)) {
                 const hxnumber = Number(newCard.collectorNumber).toString(16);
