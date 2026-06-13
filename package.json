@@ -1,14 +1,13 @@
 {
-  "name": "@runeform/hxdec",
-  "version": "1.0.0",
+  "name": "hxdec",
+  "version": "1.0.1",
   "description": "A Hexidecimal Magic the Gathering Decklist format.",
-  "main": "index.js",
+  "main": "./lib/index.js",
   "type": "module",
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
-    "build:watch": "tsc --watch",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:watch": "tsc --watch"
   },
   "keywords": [],
   "author": "",
