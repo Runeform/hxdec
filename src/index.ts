@@ -10,93 +10,7 @@ const hxdec = {
             hxdec.error("Set data not ready yet, cannot encode");
             return;
         }
-        const digestList = () => {
-            if (list.length === 0) {
-                hxdec.error("No deck list provided");
-                return [];
-            }
-            const sections = list.split("\n\n");
-            const listData = {
-                name: "",
-                targetSection: "",
-                commander: [] as Obj[],
-                mainboard: [] as Obj[],
-                sideboard: [] as Obj[],
-                maybeboard: [] as Obj[],
-                companion: [] as Obj[],
-                prefetch: [] as Obj[], // cards that need to be fetched from scryfall to get set and collector number info for encoding
-            } as Obj;
-            let targetSection = "mainboard"; // default section target
-            sections.forEach((section) => {
-                const sec = section.split("\n");
-                sec.forEach((line, index) => {
-                    line = line.trim();
 
-                    // if  line doesnt start with a number followed by " " or "x ", It is not a card line.  Check to see if its a section title and then, assign  the targetSection based on the title.  If the title is "About" and it is the first line of the first section, check to see if the second line starts with "Name " and if so, capture the deck name from that line and assign it to listData.name.  If the line is not a card line or a section header, skip it.
-                    if (!/^\d+x?\s/.test(line)) {
-                        const titleLine = line.toLowerCase().replace(":", "");
-                        console.log(`Processing section by title: ${titleLine}`);
-                        if (titleLine === "commander" || titleLine === "companion" || titleLine === "sideboard" || titleLine === "maybeboard" || titleLine === "mainboard") {
-                            targetSection = titleLine;
-                        }
-                        if (titleLine === "deck") {
-                            targetSection = "mainboard";
-                        }
-                        if (titleLine === "about" && index === 0 && /^Name\s/.test(sec[1])) {
-                            listData.name = sec[1].split("Name")[1].trim();
-                        }
-                        return;
-                    } else if (sec.length < 3 && index === 0 && listData.commander.length === 0) {
-                        // 1-2 separate lines with no section headerde notes commanders for some formats
-                        targetSection = "commander";
-                        console.log(`Processing commanders by layout`, targetSection);
-                    } else if (index === 0) {
-                        console.log(`Processing mainboard by layout`, targetSection);
-                    }
-                    const newCard = hxdec.digestCard(line);
-                    if (newCard.hxnumber.length === 0 || newCard.hxcode.length === 0) {
-                        listData.prefetch = listData.prefetch || [];
-                        listData.prefetch.push({ ...newCard, targetSection });
-                        return;
-                    } else if (newCard.cat.includes("Commander")) {
-                        listData.commander = listData.commander || [];
-                        listData.commander.push({ ...newCard, targetSection });
-                    } else {
-                        listData[targetSection] = listData[targetSection] || [];
-                        listData[targetSection].push({ ...newCard, targetSection });
-                    }
-                });
-
-            });
-            if (listData.prefetch.length > 0) {
-                hxdec.getCardData(listData.prefetch, ["set", "collector_number"], (cards: Obj[]) => {
-                    cards.forEach((card: Obj) => {
-                        // add each card to its target section and update the hxcode and hxnumber based on the set and collector number
-                        if (card.set.length > 0 && card.collector_number.length > 0 && hxdec.setData.length > 0) {
-                            card.hxcode = hxdec.setData.find(s => s.code.toLowerCase() === card.set.toLowerCase())?.hxcode || null;
-                            if (card.hxcode) {
-                                const collectorNumber = card.collector_number;
-                                if (/^\d+$/.test(collectorNumber)) {
-                                    card.hxnumber = Number(collectorNumber).toString(16);
-                                } else {
-                                    card.hxnumber = `~${collectorNumber}~`;
-                                }
-                            } else {
-                                hxdec.warning(`No set data found for set: ${card.set} on card: ${card.name}`);
-                            }
-                            listData[card.targetSection] = listData[card.targetSection] || [];
-                            listData[card.targetSection].push(card);
-                        }
-                    });
-                    console.log("Decoded list data and fetched missing card info from scryfall:", listData);
-                    buildHxdec(listData);
-                });
-            } else {
-                console.log("Decoded list data:", listData);
-                buildHxdec(listData);
-            }
-            return;
-        }
         const buildHxdec = (listData: Obj) => {
             // build the hxdec string based on the listData and setData
             const outputCards = (rawCards: Obj[]) => {
@@ -168,9 +82,9 @@ const hxdec = {
             return;
 
         }
-
         hxdec.loading("Processing deck list");
-        digestList();
+        hxdec.digestList(list, listData => buildHxdec(listData));
+
     },
     decode: (list: string, format = "Archideckt") => {
         if (hxdec.setData.length === 0) {
@@ -450,6 +364,93 @@ const hxdec = {
                 console.error("Error fetching set data from scryfall", err);
                 return;
             });
+    },
+    digestList: (list: string, callback: (listData: Obj) => void) => {
+        if (list.length === 0) {
+            hxdec.error("No deck list provided");
+            return {} as Obj;
+        }
+        const sections = list.split("\n\n");
+        const listData = {
+            name: "",
+            targetSection: "",
+            commander: [] as Obj[],
+            mainboard: [] as Obj[],
+            sideboard: [] as Obj[],
+            maybeboard: [] as Obj[],
+            companion: [] as Obj[],
+            prefetch: [] as Obj[], // cards that need to be fetched from scryfall to get set and collector number info for encoding
+        } as Obj;
+        let targetSection = "mainboard"; // default section target
+        sections.forEach((section) => {
+            const sec = section.split("\n");
+            sec.forEach((line, index) => {
+                line = line.trim();
+
+                // if  line doesnt start with a number followed by " " or "x ", It is not a card line.  Check to see if its a section title and then, assign  the targetSection based on the title.  If the title is "About" and it is the first line of the first section, check to see if the second line starts with "Name " and if so, capture the deck name from that line and assign it to listData.name.  If the line is not a card line or a section header, skip it.
+                if (!/^\d+x?\s/.test(line)) {
+                    const titleLine = line.toLowerCase().replace(":", "");
+                    console.log(`Processing section by title: ${titleLine}`);
+                    if (titleLine === "commander" || titleLine === "companion" || titleLine === "sideboard" || titleLine === "maybeboard" || titleLine === "mainboard") {
+                        targetSection = titleLine;
+                    }
+                    if (titleLine === "deck") {
+                        targetSection = "mainboard";
+                    }
+                    if (titleLine === "about" && index === 0 && /^Name\s/.test(sec[1])) {
+                        listData.name = sec[1].split("Name")[1].trim();
+                    }
+                    return;
+                } else if (sec.length < 3 && index === 0 && listData.commander.length === 0) {
+                    // 1-2 separate lines with no section headerde notes commanders for some formats
+                    targetSection = "commander";
+                    console.log(`Processing commanders by layout`, targetSection);
+                } else if (index === 0) {
+                    console.log(`Processing mainboard by layout`, targetSection);
+                }
+                const newCard = hxdec.digestCard(line);
+                if (newCard.hxnumber.length === 0 || newCard.hxcode.length === 0) {
+                    listData.prefetch = listData.prefetch || [];
+                    listData.prefetch.push({ ...newCard, targetSection });
+                    return;
+                } else if (newCard.cat.includes("Commander")) {
+                    listData.commander = listData.commander || [];
+                    listData.commander.push({ ...newCard, targetSection });
+                } else {
+                    listData[targetSection] = listData[targetSection] || [];
+                    listData[targetSection].push({ ...newCard, targetSection });
+                }
+            });
+
+        });
+        if (listData.prefetch.length > 0) {
+            hxdec.getCardData(listData.prefetch, ["set", "collector_number"], (cards: Obj[]) => {
+                cards.forEach((card: Obj) => {
+                    // add each card to its target section and update the hxcode and hxnumber based on the set and collector number
+                    if (card.set.length > 0 && card.collector_number.length > 0 && hxdec.setData.length > 0) {
+                        card.hxcode = hxdec.setData.find(s => s.code.toLowerCase() === card.set.toLowerCase())?.hxcode || null;
+                        if (card.hxcode) {
+                            const collectorNumber = card.collector_number;
+                            if (/^\d+$/.test(collectorNumber)) {
+                                card.hxnumber = Number(collectorNumber).toString(16);
+                            } else {
+                                card.hxnumber = `~${collectorNumber}~`;
+                            }
+                        } else {
+                            hxdec.warning(`No set data found for set: ${card.set} on card: ${card.name}`);
+                        }
+                        listData[card.targetSection] = listData[card.targetSection] || [];
+                        listData[card.targetSection].push(card);
+                    }
+                });
+                console.log("Decoded list data and fetched missing card info from scryfall:", listData);
+                callback(listData);
+            });
+        } else {
+            console.log("Decoded list data:", listData);
+            callback(listData);
+        }
+        return;
     },
     getCardData: async (cards: Obj[], properties: string[], callback: (cardInfos: Obj[]) => void) => {
         // fetch all cards from scryfall
