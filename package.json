@@ -1,0 +1,23 @@
+{
+  "name": "@runeform/hxdec",
+  "version": "1.0.0",
+  "description": "A Hexidecimal Magic the Gathering Decklist format.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint --ext .js,.ts .",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "globals": "^17.6.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.0"
+  }
+}
