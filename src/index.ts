@@ -1,3 +1,4 @@
+import packageJson from '../package.json';
 
 type Obj = {
     [key: string]: any;
@@ -7,108 +8,50 @@ const hxdec = {
     setData: [] as Obj[], // to be populated with set data from scryfall on init
     go: (opt: Obj) => {
         if (opt.list) {
+            opt.format = opt.format || "archideckt";
+            opt.format = opt.format.toLowerCase();
             const strippedList = opt.list.replaceAll(/\[(.*?)\]/, "").replaceAll(/\*(.*?)\*/g, "").replaceAll(/\^(.*?)\^/g, "").replaceAll(/~(.*?)~/g, "").replaceAll(/\+(.*?)\+/g, "");
             if (strippedList.test(/^h[uvwxyzksmpabcdef\d]*$/)) {
                 // HXDEC string detected, decode it
-                opt.format = opt.format || "Archideckt";
                 if (opt.format === "hxdec") {
-                    hxdec.warning("You attempted to decode a hxdec string and output it as the same hxdec format. Please specify a different supported format to convert to, such as 'MTGO', 'Arena', or 'Moxfield'. Defaulting to Archideckt format output.");
-                    opt.format = "Archideckt";
+                    hxdec.warning("You attempted to decode a hxdec string and output it as the same hxdec format. Please specify a different supported format to convert to, such as 'MTGO', 'Arena', 'Archideckt', or 'Moxfield'. Defaulting to Archideckt format output.");
+                    opt.format = "archideckt";
                 }
                 hxdec.decode(opt.list, opt.format);
             } else {
                 // regular deck list detected, encode it
-                hxdec.encode(opt.list, opt.foil || false, opt.tags || false, opt.cat || false);
+                hxdec.encode(opt.list, opt.foil || false, opt.tags || false, opt.cat || false, opt.format || "hxdec");
             }
         } else {
             hxdec.error("No deck list provided to hxdec.go. Please format your call like hxdec.go({ list: 'your deck list here', format: 'optional output format here', foil: true/false, tags: true/false, cat: true/false })");
         }
     },
-    encode: (list: string, foil = false, tags = false, cat = false) => {
+    encode: (list: string, foil = false, tags = false, cat = false, format = "hxdec") => {
+        // Encode a traditional deck list into a HXDEC string or other supported format based on the specified output format
         if (hxdec.setData.length === 0) {
             hxdec.error("Set data not ready yet, cannot encode");
             return;
-        }
-        const buildHxdec = (listData: Obj) => {
-            // build the hxdec string based on the listData and setData
-            const outputCards = (rawCards: Obj[]) => {
-                let newCards = ""
-                rawCards.forEach(card => {
-                    const qtyChars = ["u", "v", "w", "x", "y", "z"];
-                    let cardString = "";
-                    if (card.qty >= 1 && card.qty <= 4) {
-                        cardString += qtyChars[card.qty - 1];
-                    } else if (card.qty > 4 && card.qty < 16) {
-                        const qtyHex = Number(card.qty).toString(16);
-                        cardString += `y${qtyHex}`;
-                    } else if (card.qty >= 16 && card.qty < 256) {
-                        const qtyHex = Number(card.qty).toString(16);
-                        cardString += `z${qtyHex}`;
-                    } else {
-                        cardString += "zff";
-                    }
-                    cardString += card.hxcode;
-                    cardString += card.hxnumber;
-                    if (foil && card.foil.length > 0) {
-                        cardString += `*${card.foil}*`;
-                    }
-                    if (tags && card.tags.length > 0) {
-                        cardString += `^${card.tags}^`;
-                    }
-                    if (cat && card.cat.length > 0) {
-                        cardString += `[${card.cat}]`;
-                    }
-                    newCards += cardString;
-                });
-                return newCards;
-            }
-            if (listData.mainboard.length === 0 || listData.mainboard.length === 0) {
-                hxdec.error("No mainboard cards found, cannot build HXDEC");
-                return;
-            }
-            // If this is a type of format that lists a commander as the first card in the mainboard section without a section header, move it to the commander section and remove it from the mainboard section
-            if (listData.mainboard.length > 0 && listData.commander.length === 0) {
-                // count the number of cards in the mainboard
-                let mainboardCount = 0;
-                listData.mainboard.forEach((mainboardCard: Obj) => {
-                    mainboardCount += mainboardCard.qty;
-                });
-                if (mainboardCount > 98) {
-                    // Mainboard has more than 98 cards and no commander specified, treating first card as commander
-                    listData.commander = [listData.mainboard[0]];
-                    listData.mainboard = listData.mainboard.slice(1);
-                }
-            }
-            let deck = `h${outputCards(listData.mainboard)}`;
-            if (listData.commander.length > 0) {
-                deck += `k${outputCards(listData.commander)}`;
-            }
-            if (listData.sideboard.length > 0) {
-                deck += `s${outputCards(listData.sideboard)}`;
-            }
-            if (listData.maybeboard.length > 0) {
-                deck += `m${outputCards(listData.maybeboard)}`;
-            }
-            if (listData.companion.length > 0) {
-                deck += `p${outputCards(listData.companion)}`;
-            }
-            if (listData.name.length > 0) {
-                deck += `+${encodeURIComponent(listData.name)}+`;
-            }
-            hxdec.ready();
-            hxdec.encoded(deck);
-            return;
-
         }
         hxdec.loading("Processing deck list");
         hxdec.digestList(list, listData => {
             hxdec.getMissingCardData(listData, updatedData => {
                 const sortedListData = hxdec.sortListData(updatedData);
-                buildHxdec(sortedListData);
+                if (format === "hxdec") {
+                    hxdec.buildHxdec(sortedListData, foil, tags, cat, (hxdecList) => {
+                        hxdec.ready();
+                        hxdec.encoded(hxdecList);
+                    });
+                } else {
+                    hxdec.buildList(sortedListData, format, newList => {
+                        hxdec.ready();
+                        hxdec.encoded(newList);
+                    });
+                }
             });
         });
     },
-    decode: (list: string, format = "Archideckt") => {
+    decode: (list: string, format = "archideckt") => {
+        // Decode a HXDEC string into a traditional deck list format based on the specified output format
         if (hxdec.setData.length === 0) {
             console.log("Set data not ready yet, cannot decode");
             return;
@@ -236,8 +179,79 @@ const hxdec = {
         console.log("Sorted list data ready for HXDEC build:", sortedListData);
         return sortedListData;
     },
-    buildList: (decodedData: Obj, format: string, callback: (newList: string) => void) => {
+    buildHxdec: (listData: Obj, foil = false, tags = false, cat = false, callback: (hxdecList: string) => void) => {
+        // build the hxdec string based on the listData and setData
+        const outputCards = (rawCards: Obj[]) => {
+            let newCards = ""
+            rawCards.forEach(card => {
+                const qtyChars = ["u", "v", "w", "x", "y", "z"];
+                let cardString = "";
+                if (card.qty >= 1 && card.qty <= 4) {
+                    cardString += qtyChars[card.qty - 1];
+                } else if (card.qty > 4 && card.qty < 16) {
+                    const qtyHex = Number(card.qty).toString(16);
+                    cardString += `y${qtyHex}`;
+                } else if (card.qty >= 16 && card.qty < 256) {
+                    const qtyHex = Number(card.qty).toString(16);
+                    cardString += `z${qtyHex}`;
+                } else {
+                    cardString += "zff";
+                }
+                cardString += card.hxcode;
+                cardString += card.hxnumber;
+                if (foil && card.foil.length > 0) {
+                    cardString += `*${card.foil}*`;
+                }
+                if (tags && card.tags.length > 0) {
+                    cardString += `^${card.tags}^`;
+                }
+                if (cat && card.cat.length > 0) {
+                    cardString += `[${card.cat}]`;
+                }
+                newCards += cardString;
+            });
+            return newCards;
+        }
+        if (listData.mainboard.length === 0 || listData.mainboard.length === 0) {
+            hxdec.error("No mainboard cards found, cannot build HXDEC");
+            return;
+        }
+        // If this is a type of format that lists a commander as the first card in the mainboard section without a section header, move it to the commander section and remove it from the mainboard section
+        if (listData.mainboard.length > 0 && listData.commander.length === 0) {
+            // count the number of cards in the mainboard
+            let mainboardCount = 0;
+            listData.mainboard.forEach((mainboardCard: Obj) => {
+                mainboardCount += mainboardCard.qty;
+            });
+            if (mainboardCount > 98) {
+                // Mainboard has more than 98 cards and no commander specified, treating first card as commander
+                listData.commander = [listData.mainboard[0]];
+                listData.mainboard = listData.mainboard.slice(1);
+            }
+        }
+        let deck = `h${outputCards(listData.mainboard)}`;
+        if (listData.commander.length > 0) {
+            deck += `k${outputCards(listData.commander)}`;
+        }
+        if (listData.sideboard.length > 0) {
+            deck += `s${outputCards(listData.sideboard)}`;
+        }
+        if (listData.maybeboard.length > 0) {
+            deck += `m${outputCards(listData.maybeboard)}`;
+        }
+        if (listData.companion.length > 0) {
+            deck += `p${outputCards(listData.companion)}`;
+        }
+        if (listData.name.length > 0) {
+            deck += `+${encodeURIComponent(listData.name)}+`;
+        }
+        callback(deck);
+        return;
+
+    },
+    buildList: (decodedData: Obj, format = "archideckt", callback: (newList: string) => void) => {
         // build a traditional deck list from sorted decoded data set
+        format = format.toLowerCase();
         let formatOptions = {
             mainboardTitle: "",
             commanderTitle: "",
@@ -253,7 +267,7 @@ const hxdec = {
             tags: false,
             order: ["commander", "mainboard", "companion", "sideboard", "maybeboard"]
         } as Obj;
-        if (format === "Archideckt") {
+        if (format === "archideckt") {
             formatOptions = {
                 ...formatOptions,
                 mainboardTitle: "\nMainboard\n",
@@ -268,7 +282,7 @@ const hxdec = {
                 tags: true,
             }
         }
-        if (format === "MTGO") {
+        if (format === "mtgo") {
             formatOptions = {
                 ...formatOptions,
                 sideboardTitle: "\nSIDEBOARD:\n",
@@ -276,7 +290,7 @@ const hxdec = {
                 order: ["mainboard", "companion", "sideboard", "commander", "maybeboard"]
             }
         }
-        if (format === "Arena") {
+        if (format === "arena") {
             formatOptions = {
                 ...formatOptions,
                 mainboardTitle: "\nDeck\n",
@@ -286,7 +300,7 @@ const hxdec = {
                 name: true,
             }
         }
-        if (format === "Moxfield") {
+        if (format === "moxfield") {
             formatOptions = {
                 ...formatOptions,
                 sideboardTitle: "\nSIDEBOARD:\n",
@@ -348,7 +362,7 @@ const hxdec = {
         fetch("https://api.scryfall.com/sets", {
             headers: {
                 "Content-Type": "application/json",
-                "User-Agent": "hxdec/1.0.2",
+                "User-Agent": `hxdec/${packageJson.version}`,
                 "Accept": "application/json",
             }
         }
@@ -550,7 +564,7 @@ const hxdec = {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "User-Agent": "hxdec/1.0.2",
+                    "User-Agent": `hxdec/${packageJson.version}`,
                     "Accept": "application/json",
                 },
                 body: JSON.stringify({ identifiers })
