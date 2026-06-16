@@ -308,7 +308,7 @@ const hxdec = {
                         listData.name = sec[1].split("Name")[1].trim();
                     }
                     return;
-                } else if (sec.length < 3 && index === 0 && listData.commander.length === 0) {
+                } else if (sec.length < 3 && index === 0) {
                     // 1-2 separate lines with no section headerde notes commanders for some formats
                     targetSection = "commander";
                     console.log(`Processing commanders by layout`, targetSection);
