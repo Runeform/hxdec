@@ -1,4 +1,4 @@
-// import packageJson from '../package.json';
+import packageJson from '../package.json';
 
 type Obj = {
     [key: string]: any;
@@ -29,8 +29,8 @@ const hxdec = {
                         hxdec.getMissingCardData(listData, updatedData => {
                             const sortedListData = hxdec.sortListData(updatedData);
                             hxdec.buildList(sortedListData, opt.format, newList => {
-                                hxdec.ready();
                                 hxdec.encoded(newList);
+                                hxdec.ready();
                             });
                         });
                     });
@@ -42,13 +42,13 @@ const hxdec = {
                             const sortedListData = hxdec.sortListData(updatedData);
                             if (opt.format === "hxdec") {
                                 hxdec.buildHxdec(sortedListData, opt.foil || false, opt.tags || false, opt.cat || false, (hxdecList) => {
-                                    hxdec.ready();
                                     hxdec.encoded(hxdecList);
+                                    hxdec.ready();
                                 });
                             } else {
                                 hxdec.buildList(sortedListData, opt.format, newList => {
-                                    hxdec.ready();
                                     hxdec.encoded(newList);
+                                    hxdec.ready();
                                 });
                             }
                         });
@@ -77,7 +77,8 @@ const hxdec = {
                         hxdec.digestHxdec(opt.list, listData => {
                             hxdec.getMissingCardData(listData, updatedData => {
                                 const sortedListData = hxdec.sortListData(updatedData);
-                                hxdec.encoded({ data: sortedListData })
+                                hxdec.encoded({ data: sortedListData });
+                                hxdec.ready();
                             });
                             return;
                         });
@@ -92,12 +93,14 @@ const hxdec = {
                         if (opt.fetch) {
                             hxdec.getMissingCardData(listData, updatedData => {
                                 const sortedListData = hxdec.sortListData(updatedData);
-                                hxdec.encoded({ data: sortedListData })
+                                hxdec.encoded({ data: sortedListData });
+                                hxdec.ready();
                             });
                             return;
                         }
                         const sortedListData = hxdec.sortListData(listData);
-                        hxdec.encoded({ data: sortedListData })
+                        hxdec.encoded({ data: sortedListData });
+                        hxdec.ready();
                         return
                     });
                 }
@@ -119,8 +122,7 @@ const hxdec = {
         fetch("https://api.scryfall.com/sets", {
             headers: {
                 "Content-Type": "application/json",
-                // "User-Agent": `hxdec/${packageJson.version}`,
-                "User-Agent": `hxdec/development`,
+                "User-Agent": `hxdec/${packageJson.version}`,
                 "Accept": "application/json",
             }
         }
@@ -174,7 +176,6 @@ const hxdec = {
             console.log("Set data not ready yet, cannot decode");
             return;
         }
-        hxdec.loading("Decoding HXDEC string");
         // Decoding logic to be implemented
         // remove values wrapped and store them in an array, replace them in the deck string with their index in the array wrapped in thier original wrap symbol so they can be reinserted after splitting the string into sections
         const captureWrappedValues = (wrap1: string, wrap2: string, regex: RegExp) => {
@@ -254,6 +255,7 @@ const hxdec = {
                     let number: string = Number(parseInt(numberHx, 16)).toString();
                     if (isNaN(parseInt(number)) && numberHx.includes("~")) {
                         number = textSets[parseInt(numberHx.replace("~", ""))];
+                        //code.replace(/~(.*?)~/, `~${number}~`);
                     } else if (isNaN(parseInt(number))) {
                         console.log(`Invalid collector number hex: ${numberHx} for code: ${code}`);
                     }
@@ -265,7 +267,7 @@ const hxdec = {
                         set = setInfo.code;
                     }
 
-                    const newCard = { name: "", code, qty, set, collector_number: number, foil, tags, category, targetSection, isComplete: false } as Obj;
+                    const newCard = { name: "", qty, set, collector_number: number, foil, tags, category, targetSection, isComplete: false } as Obj;
 
                     cards.push(newCard);
                 });
@@ -311,16 +313,12 @@ const hxdec = {
                 } else if (sec.length < 3 && index === 0) {
                     // 1-2 separate lines with no section headerde notes commanders for some formats
                     targetSection = "commander";
-                    console.log(`Processing commanders by layout`, targetSection);
-                } else if (index === 0) {
-                    console.log(`Processing mainboard by layout`, targetSection);
                 }
                 const newCard = hxdec.digestCard(line);
                 newCard.isComplete = newCard.hxset.length > 0 && newCard.hxnumber.length > 0 && newCard.name.length > 0;
                 listData.cards.push({ ...newCard, targetSection });
             });
         });
-        console.log("Decoded list data:", listData);
         callback(listData);
 
         return;
@@ -382,10 +380,9 @@ const hxdec = {
         } as Obj;
         listData.cards.forEach((card: Obj) => {
             sortedListData[card.targetSection] = sortedListData[card.targetSection] || [];
-            card.isComplete = "undefined";
+            delete card.isComplete;
             sortedListData[card.targetSection].push(card);
         });
-        console.log("Sorted list data ready for HXDEC build:", sortedListData);
         return sortedListData;
     },
     buildHxdec: (listData: Obj, foil = false, tags = false, cat = false, callback: (hxdecList: Obj) => void) => {
@@ -573,7 +570,6 @@ const hxdec = {
         callback({ format, list: newList, data: decodedData });
     },
     getMissingCardData: (listData: Obj, callback: (updatedData: Obj) => void) => {
-        console.log("Getting missing data for:", listData);
         const incompleteCards = listData.cards.filter((card: Obj) => !card.isComplete);
         const updatedCards = [] as Obj[];
         // delete the cards that are missing data from "cards" in listData so they can be readded with the full data after fetching from scryfall
@@ -600,7 +596,6 @@ const hxdec = {
                         console.log('Card still not complete after fetching data:', card);
                     }
                 });
-                console.log("Decoded list data and fetched missing card info from scryfall:", listData);
                 listData.cards = [...listData.cards, ...updatedCards];
                 callback(listData);
             });
@@ -639,8 +634,7 @@ const hxdec = {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    // "User-Agent": `hxdec/${packageJson.version}`,
-                    "User-Agent": `hxdec/development`,
+                    "User-Agent": `hxdec/${packageJson.version}`,
                     "Accept": "application/json",
                 },
                 body: JSON.stringify({ identifiers })
@@ -649,14 +643,9 @@ const hxdec = {
                 .then(resp => {
                     if (resp.data && resp.data.length > 0) {
                         cardInfos.push(...resp.data);
-
                         requestedCardsCount += identifiers.length;
-                        console.log(`Fetched card info from scryfall for batch of ${identifiers.length} identifiers:`, resp.data);
-                        console.log(`Total card info fetched so far: ${cardInfos.length} of ${cards.length}`);
-                        console.log(`Total card identifiers requested: ${requestedCardsCount}`);
                         if (requestedCardsCount >= cards.length) {
                             // all card info has been fetched, add the card names to the cards in the decoded data
-                            console.log("All batches processed, matching card info to cards in list data...", cards.length);
                             cards.forEach((card, index) => {
                                 let cardInfo = {} as Obj;
                                 if (card.name.length > 0 && (card.set.length === 0 || card.collector_number.length === 0)) {
@@ -667,7 +656,6 @@ const hxdec = {
                                 if (cardInfo && Object.keys(cardInfo).length !== 0) {
                                     properties.forEach(prop => {
                                         if (typeof cardInfo[prop] !== "undefined" && cards[index][prop] === "") {
-                                            // console.log(`Updating card: ${card.name} with ${prop} from scryfall: ${cardInfo[prop]}`);
                                             cards[index][prop] = cardInfo[prop];
                                             cards[index].updated = true;
                                         }
