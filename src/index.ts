@@ -139,11 +139,11 @@ const hxdec = {
                     let setCounter = 1;
                     initSetsData.forEach((set: Obj) => {
                         if (set.set_type !== "token") {
-                            const hxcode = Number(setCounter).toString(16).padStart(3, "0");
+                            const hxset = Number(setCounter).toString(16).padStart(3, "0");
                             const newSet = {
                                 date: new Date(set.released_at).getTime(),
                                 code: set.code,
-                                hxcode
+                                hxset
                             };
                             sets.push(newSet);
                             setCounter++;
@@ -260,7 +260,7 @@ const hxdec = {
                     let set = "";
 
                     // find set in set data
-                    const setInfo = hxdec.setData.find(s => s.hxcode === setHx);
+                    const setInfo = hxdec.setData.find(s => s.hxset === setHx);
                     if (setInfo) {
                         set = setInfo.code;
                     }
@@ -316,7 +316,7 @@ const hxdec = {
                     console.log(`Processing mainboard by layout`, targetSection);
                 }
                 const newCard = hxdec.digestCard(line);
-                newCard.isComplete = newCard.hxcode.length > 0 && newCard.hxnumber.length > 0 && newCard.name.length > 0;
+                newCard.isComplete = newCard.hxset.length > 0 && newCard.hxnumber.length > 0 && newCard.name.length > 0;
                 listData.cards.push({ ...newCard, targetSection });
             });
         });
@@ -336,7 +336,7 @@ const hxdec = {
             cat: "",
             tags: "",
             collector_number: "",
-            hxcode: "",
+            hxset: "",
             hxnumber: "",
         } as Obj;
         const trimValue = (property: string, start: string, end: string) => {
@@ -357,11 +357,12 @@ const hxdec = {
         trimValue("tags", "^", "^");
         const nameSplit = name.split("::::");
         name = nameSplit[0].trim();
+        newCard.name = name;
         if (nameSplit.length > 1) {
             newCard.collector_number = nameSplit[1].trim();
         }
         if (newCard.set.length > 0) {
-            newCard.hxcode = hxdec.setData.find(s => s.code.toLowerCase() === newCard.set.toLowerCase())?.hxcode || null;
+            newCard.hxset = hxdec.setData.find(s => s.code.toLowerCase() === newCard.set.toLowerCase())?.hxset || null;
         }
         if (newCard.collector_number.length > 0) {
             // if collector number is just a number, convert to hex and pad to 3 digits
@@ -411,7 +412,7 @@ const hxdec = {
                 } else {
                     cardString += "zff";
                 }
-                cardString += card.hxcode;
+                cardString += card.hxset;
                 cardString += card.hxnumber;
                 if (foil && card.foil.length > 0) {
                     cardString += `*${card.foil}*`;
@@ -581,11 +582,11 @@ const hxdec = {
             listData.cards = listData.cards.filter((card: Obj) => card.isComplete);
             hxdec.getCardData(incompleteCards, ["name", "set", "collector_number"], (cards: Obj[]) => {
                 cards.forEach((card: Obj) => {
-                    // add each card to its target section and update the hxcode and hxnumber based on the set and collector number
+                    // add each card to its target section and update the hxset and hxnumber based on the set and collector number
                     if (card.set.length > 0 && card.collector_number.length > 0 && hxdec.setData.length > 0) {
-                        card.hxcode = hxdec.setData.find(s => s.code.toLowerCase() === card.set.toLowerCase())?.hxcode || null;
+                        card.hxset = hxdec.setData.find(s => s.code.toLowerCase() === card.set.toLowerCase())?.hxset || null;
                         card.isComplete = true;
-                        if (card.hxcode) {
+                        if (card.hxset) {
                             if (/^\d+$/.test(card.collector_number)) {
                                 card.hxnumber = Number(card.collector_number).toString(16);
                             } else {

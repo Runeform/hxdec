@@ -1,6 +1,6 @@
 {
   "name": "hxdec",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A Hexidecimal Magic the Gathering Decklist format.",
   "main": "./lib/index.js",
   "type": "module",
