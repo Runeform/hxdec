@@ -383,7 +383,7 @@ const hxdec = {
         }
         trimValue("set", "(", ")");
         trimValue("foil", "*", "*");
-        trimValue("cat", "[", "]");
+        trimValue("category", "[", "]");
         trimValue("tags", "^", "^");
         const nameSplit = name.split("::::");
         name = nameSplit[0].trim();
