@@ -322,8 +322,8 @@ const hxdec = {
             name: "",
             cards: [] as Obj[],
         } as Obj;
-        let target_section = "mainboard"; // default section target
         sections.forEach((section) => {
+            let target_section = "mainboard"; // default section target
             const sec = section.split("\n");
             sec.forEach((line, index) => {
                 line = line.trim();
@@ -387,6 +387,8 @@ const hxdec = {
         trimValue("tags", "^", "^");
         const nameSplit = name.split("::::");
         name = nameSplit[0].trim();
+        name = name.replace("꞉", ":"); // remove non colon colon
+        name = name.replace("’", "'"); // remove non-standard apostraphe
         newCard.name = name;
         newCard.set = newCard.set.toLowerCase();
         if (nameSplit.length > 1) {
