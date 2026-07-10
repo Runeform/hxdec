@@ -1,32 +1,37 @@
 import packageJson from '../package.json';
-
 type Obj = {
     [key: string]: any;
 }
 
 const hxdec = {
+    version: packageJson.version,
     setData: [] as Obj[], // to be populated with set data from scryfall on init
     go: (opt: Obj) => {
-        opt.fetchSetData = typeof opt.fetchSetData !== "undefined" ? opt.fetchSetData : true;
-        opt.fetchCardData = typeof opt.fetchCardData !== "undefined" ? opt.fetchCardData : true;
-        const delgateList = () => {
-            if (typeof opt.list === "string") {
-                opt.format = opt.format || "hxdec";
-                opt.format = opt.format.toLowerCase();
-                const acceptedFormats = ["archideckt", "moxfield", "arena", "mtgo", "hxdec"];
-                if (acceptedFormats.indexOf(opt.format) === -1) {
-                    hxdec.error(`"${opt.format}" is not a supported output format. Supported output formats are... "archideckt", "moxfield", "arena", "mtgo" and "hxdec"`);
-                    return;
+        if (typeof opt.list === "string") {
+            opt.fetchSetList = typeof opt.fetchSetList !== "undefined" ? opt.fetchSetList : true;
+            opt.fetchCardSet = typeof opt.fetchCardSet !== "undefined" ? opt.fetchCardSet : true;
+            opt.fetchCardName = typeof opt.fetchCardName !== "undefined" ? opt.fetchCardName : true;
+            opt.listIsHxdec = hxdec.isHxdec(opt.list);
+            opt.format = opt.format || "hxdec";
+            opt.format = opt.format.toLowerCase();
+            const acceptedFormats = ["archideckt", "moxfield", "arena", "mtgo", "hxdec"];
+            if (acceptedFormats.indexOf(opt.format) === -1) {
+                hxdec.error(`"${opt.format}" is not a supported output format. Supported output formats are... "archideckt", "moxfield", "arena", "mtgo" and "hxdec"`);
+                return;
+            }
+            if (opt.listIsHxdec) {
+                // HXDEC string detected, decode it
+                if (opt.format === "hxdec") {
+                    hxdec.warning("You attempted to decode a hxdec string and output it as the same hxdec format. Please specify a different supported format to convert to, such as 'MTGO', 'Arena', 'Archideckt', or 'Moxfield'. Defaulting to Archideckt format output.");
+                    opt.format = "archideckt";
                 }
-                if (hxdec.isHxdec(opt.list)) {
+            }
+            const delgateList = () => {
+                if (opt.listIsHxdec) {
                     hxdec.loading("Processing HXDEC deck list");
                     // HXDEC string detected, decode it
-                    if (opt.format === "hxdec") {
-                        hxdec.warning("You attempted to decode a hxdec string and output it as the same hxdec format. Please specify a different supported format to convert to, such as 'MTGO', 'Arena', 'Archideckt', or 'Moxfield'. Defaulting to Archideckt format output.");
-                        opt.format = "archideckt";
-                    }
                     hxdec.digestHxdec(opt.list, listData => {
-                        hxdec.getMissingCardData(listData, updatedData => {
+                        hxdec.getMissingCardData(listData, opt, updatedData => {
                             const sortedListData = hxdec.sortListData(updatedData);
                             hxdec.buildList(sortedListData, opt.format, newList => {
                                 hxdec.encoded(newList);
@@ -38,7 +43,7 @@ const hxdec = {
                     hxdec.loading("Processing traditional deck list");
                     // regular deck list detected, encode it
                     hxdec.digestList(opt.list, listData => {
-                        hxdec.getMissingCardData(listData, updatedData => {
+                        hxdec.getMissingCardData(listData, opt, updatedData => {
                             const sortedListData = hxdec.sortListData(updatedData);
                             if (opt.format === "hxdec") {
                                 hxdec.buildHxdec(sortedListData, opt.foil || false, opt.tags || false, opt.category || false, (hxdecList) => {
@@ -54,67 +59,58 @@ const hxdec = {
                         });
                     });
                 }
+            }
+            if (hxdec.setData.length === 0) {
+                hxdec.init(opt, () => delgateList())
                 return;
             }
-            hxdec.error("No deck list provided to hxdec.go. Please format your call like hxdec.go({ list: 'your deck list here', format: 'optional output format here', foil: true/false, tags: true/false, category: true/false })");
+            delgateList();
             return;
         }
-        if (hxdec.setData.length === 0) {
-            hxdec.init(true, () => delgateList())
-            return;
-        }
-        delgateList();
+        hxdec.error("No deck list detected. Please format your call like hxdec.go({ list: 'your deck list here', format: 'optional output format here' })");
         return;
+
     },
     getListData: (opt: Obj) => {
-        opt.fetchSetData = typeof opt.fetchSetData !== "undefined" ? opt.fetchSetData : true;
-        opt.fetchCardData = typeof opt.fetchCardData !== "undefined" ? opt.fetchCardData : true;
-        const delgateList = () => {
-            if (typeof opt.list === "string") {
-                if (hxdec.isHxdec(opt.list)) {
+        if (typeof opt.list === "string") {
+            opt.fetchSetList = typeof opt.fetchSetList !== "undefined" ? opt.fetchSetList : true;
+            opt.fetchCardSet = typeof opt.fetchCardSet !== "undefined" ? opt.fetchCardSet : true;
+            opt.fetchCardName = typeof opt.fetchCardName !== "undefined" ? opt.fetchCardName : true;
+            opt.listIsHxdec = hxdec.isHxdec(opt.list);
+            opt.format = 'data';
+            const delgateList = () => {
+                if (opt.listIsHxdec) {
                     hxdec.loading("Processing HXDEC deck list");
                     hxdec.digestHxdec(opt.list, listData => {
-                        if (opt.fetchCardData === true) {
-                            hxdec.getMissingCardData(listData, updatedData => {
-                                const sortedListData = hxdec.sortListData(updatedData);
-                                hxdec.encoded({ format: "data", data: sortedListData });
-                                hxdec.ready();
-                            });
-                            return;
-                        }
-                        const sortedListData = hxdec.sortListData(listData);
-                        hxdec.encoded({ format: "data", data: sortedListData });
-                        hxdec.ready();
-                        return
+                        hxdec.getMissingCardData(listData, opt, updatedData => {
+                            const sortedListData = hxdec.sortListData(updatedData);
+                            hxdec.encoded({ format: "data", data: sortedListData });
+                            hxdec.ready();
+                        });
+                        return;
                     });
                 } else {
                     hxdec.loading("Processing traditional deck list");
                     // regular deck list detected, encode it
                     hxdec.digestList(opt.list, listData => {
-                        if (opt.fetchCardData === true) {
-                            hxdec.getMissingCardData(listData, updatedData => {
-                                const sortedListData = hxdec.sortListData(updatedData);
-                                hxdec.encoded({ format: "data", data: sortedListData });
-                                hxdec.ready();
-                            });
-                            return;
-                        }
-                        const sortedListData = hxdec.sortListData(listData);
-                        hxdec.encoded({ format: "data", data: sortedListData });
-                        hxdec.ready();
-                        return
+                        hxdec.getMissingCardData(listData, opt, updatedData => {
+                            const sortedListData = hxdec.sortListData(updatedData);
+                            hxdec.encoded({ format: "data", data: sortedListData });
+                            hxdec.ready();
+                        });
+                        return;
                     });
                 }
                 return;
             }
-            hxdec.error("No deck list provided to hxdec.go. Please format your call like hxdec.go({ list: 'your deck list here', format: 'optional output format here', foil: true/false, tags: true/false, category: true/false })");
+            if (hxdec.setData.length === 0) {
+                hxdec.init(opt, () => delgateList())
+                return;
+            }
+            delgateList();
             return;
         }
-        if (hxdec.setData.length === 0) {
-            hxdec.init(opt.fetchSetData, () => delgateList())
-            return;
-        }
-        delgateList();
+        hxdec.error("No deck list detected. Please format your call like hxdec.getListData({list: 'your deck list here'})");
         return;
     },
     isHxdec: (list: string) => {
@@ -122,8 +118,9 @@ const hxdec = {
         const hxdecPattern = /^h[uvwxyzksmpabcdef\d]*$/;
         return hxdecPattern.test(strippedList);
     },
-    init: (fetchSetData = true, callback: () => void) => {
+    init: (opt: Obj, callback: () => void) => {
         // fetch all sets from scryfall and prepare them for initial firebase upload
+        // If cached set data is available, always use it.
         const localObject = () => {
             // Extend the storage object to allow for setting and getting objects in local storage
             Storage.prototype.setObject = function (key: string, value: Obj) {
@@ -137,7 +134,6 @@ const hxdec = {
         };
         localObject();
         const cachedSetData = localStorage.getObject('hxdecSetData');
-        console.log('cachedSetData', cachedSetData);
         const now = new Date().getTime();
         const day = 1000 * 60 * 60 * 24;
         if (cachedSetData && now - cachedSetData.age < 10 * day) {
@@ -146,7 +142,9 @@ const hxdec = {
             callback();
             return;
         }
-        if (!fetchSetData) {
+        // if the user has specified to not fetSetData dont
+        // if not reading a hxdec list or converting to a hxdec list dont fetchSetData
+        if (!opt.fetchSetList || !(opt.listIsHxdec || opt.format === 'hxdec')) {
             callback();
             return;
         }
@@ -154,7 +152,7 @@ const hxdec = {
         fetch("https://api.scryfall.com/sets", {
             headers: {
                 "Content-Type": "application/json",
-                "User-Agent": `hxdec/${packageJson.version}`,
+                "User-Agent": `hxdec/${hxdec.version}`,
                 "Accept": "application/json",
             }
         }
@@ -297,9 +295,9 @@ const hxdec = {
                             set = setInfo.code;
                         }
                     } else {
-                        console.log('Cannot get set, no set data available. Set "fetchSetData: true" in your options when decoding HXDEC strings.');
+                        console.log('Cannot get set, no set data available. Set "fetchSetList: true" in your options when decoding HXDEC strings.');
                     }
-                    const newCard = { name: "", qty, set, hx_set: setHx, collector_number: number, hx_collector_number: numberHx, foil, tags, category, target_section, isComplete: false } as Obj;
+                    const newCard = { name: "", qty, set, hx_set: setHx, collector_number: number, hx_collector_number: numberHx, foil, tags, category, target_section } as Obj;
 
                     cards.push(newCard);
                 });
@@ -330,13 +328,16 @@ const hxdec = {
 
                 // if  line doesnt start with a number followed by " " or "x ", It is not a card line.  Check to see if its a section title and then, assign  the target_section based on the title.  If the title is "About" and it is the first line of the first section, check to see if the second line starts with "Name " and if so, capture the deck name from that line and assign it to listData.name.  If the line is not a card line or a section header, skip it.
                 if (!/^\d+x?\s/.test(line)) {
-                    const titleLine = line.toLowerCase().replace(":", "");
-                    console.log(`Processing section by title: ${titleLine}`);
+                    const titleLine = line.toLowerCase().replace(":", "").replace(/\((.*?)\)/g, "").replace("// ", "");
+                    // console.log(`Processing section by title: ${titleLine}`);
                     if (titleLine === "commander" || titleLine === "sideboard" || titleLine === "maybeboard" || titleLine === "mainboard") {
                         target_section = titleLine;
                     }
-                    if (titleLine === "deck") {
+                    if (titleLine === "deck" || titleLine === "main") {
                         target_section = "mainboard";
+                    }
+                    if (titleLine === "sb") {
+                        target_section = "sideboard";
                     }
                     if (titleLine === "about" && index === 0 && /^Name\s/.test(sec[1])) {
                         listData.name = sec[1].split("Name")[1].trim();
@@ -347,7 +348,6 @@ const hxdec = {
                     target_section = "commander";
                 }
                 const newCard = hxdec.digestCard(line);
-                newCard.isComplete = newCard.hx_set.length > 0 && newCard.hx_collector_number.length > 0 && newCard.name.length > 0;
                 listData.cards.push({ ...newCard, target_section });
             });
         });
@@ -418,7 +418,6 @@ const hxdec = {
             maybeboard: []
         } as Obj;
         listData.cards.forEach((card: Obj) => {
-            delete card.isComplete;
             delete card.updated;
             sortedListData[card.target_section].push(card);
         });
@@ -606,19 +605,34 @@ const hxdec = {
         newList = newList.trim();
         callback({ format, list: newList, data: decodedData });
     },
-    getMissingCardData: (listData: Obj, callback: (updatedData: Obj) => void) => {
-        const incompleteCards = listData.cards.filter((card: Obj) => !card.isComplete);
+    getMissingCardData: (listData: Obj, opt: Obj, callback: (updatedData: Obj) => void) => {
+        const incompleteCards = [] as Obj[];
+        const completeCards = [] as Obj[];
         const updatedCards = [] as Obj[];
         // delete the cards that are missing data from "cards" in listData so they can be readded with the full data after fetching from scryfall
-
+        const updateProps = [] as string[];
+        if (opt.fetchCardSet) {
+            updateProps.push('set');
+            updateProps.push('collector_number');
+        }
+        if (opt.fetchCardName) {
+            updateProps.push('name');
+        }
+        listData.cards.forEach((card: Obj) => {
+            if (updateProps.some(prop => !card[prop] || card[prop].length === 0)) {
+                incompleteCards.push(card);
+            }
+            else {
+                completeCards.push(card);
+            }
+        });
         if (incompleteCards.length > 0) {
-            listData.cards = listData.cards.filter((card: Obj) => card.isComplete);
-            hxdec.getCardData(incompleteCards, ["name", "set", "collector_number"], (cards: Obj[]) => {
+            listData.cards = completeCards;
+            hxdec.getCardData(incompleteCards, updateProps, (cards: Obj[]) => {
                 cards.forEach((card: Obj) => {
                     // add each card to its target section and update the hx_set and hx_collector_number based on the set and collector number
                     if (card.set.length > 0 && card.collector_number.length > 0 && hxdec.setData.length > 0) {
                         card.hx_set = hxdec.setData.find(s => s.code.toLowerCase() === card.set.toLowerCase())?.hx_set || null;
-                        card.isComplete = true;
                         if (card.hx_set) {
                             if (/^\d+$/.test(card.collector_number)) {
                                 card.hx_collector_number = Number(card.collector_number).toString(16);
@@ -643,7 +657,7 @@ const hxdec = {
     },
     getCardData: async (cards: Obj[], properties: string[], callback: (cardInfos: Obj[]) => void) => {
         // fetch all cards from scryfall
-        const batchSize = 75; // scryfall allows up to 75 identifiers per request
+        const batchSize = 74; // scryfall allows up to 74 identifiers per request
         const delay = 500; // delay in ms between requests to avoid hitting rate limits
         const cardInfos = [] as Obj[];
         let requestedCardsCount = 0;
@@ -657,8 +671,13 @@ const hxdec = {
                         collector_number: String(card.collector_number)
                     }
                 } else if (card.name) {
+                    const trimDfc = (name: string) => {
+                        name = name.split(" / ")[0];
+                        name = name.split(" // ")[0];
+                        return name.toLowerCase();
+                    }
                     return {
-                        name: card.name
+                        name: trimDfc(card.name),
                     };
                 } else {
                     return null;
@@ -671,7 +690,7 @@ const hxdec = {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "User-Agent": `hxdec/${packageJson.version}`,
+                    "User-Agent": `hxdec/${hxdec.version}`,
                     "Accept": "application/json",
                 },
                 body: JSON.stringify({ identifiers })
@@ -686,7 +705,16 @@ const hxdec = {
                             cards.forEach((card, index) => {
                                 let cardInfo = {} as Obj;
                                 if (card.name.length > 0 && (card.set.length === 0 || card.collector_number.length === 0)) {
-                                    cardInfo = cardInfos.find(info => info.name.toLowerCase() === card.name.toLowerCase()) || {} as Obj;
+                                    cardInfo = cardInfos.find(info => {
+                                        const trimDfc = (name: string) => {
+                                            name = name.split(" / ")[0];
+                                            name = name.split(" // ")[0];
+                                            return name.toLowerCase();
+                                        }
+                                        const dataName = trimDfc(info.name);
+                                        const localName = trimDfc(card.name);
+                                        return dataName === localName;
+                                    }) || {} as Obj;
                                 } else if ((card.set.length > 0 && card.collector_number.length > 0) && card.name.length === 0) {
                                     cardInfo = cardInfos.find(info => info.set.toLowerCase() === card.set.toLowerCase() && info.collector_number === String(card.collector_number)) || {} as Obj;
                                 }
@@ -698,7 +726,7 @@ const hxdec = {
                                         }
                                     });
                                 } else {
-                                    console.log(`No card info found for card: ${card.name} with set: ${card.set} and collector number: ${card.collector_number}`);
+                                    hxdec.warning(`No card info found for card: ${card.name} with set: ${card.set} and collector number: ${card.collector_number}`);
                                 }
 
                                 // console.log("card", card, cardInfo);
@@ -708,7 +736,7 @@ const hxdec = {
                                 //console.log("All card info has been fetched, calling callback with updated cards");
                                 const missingInfoCards = cards.filter(c => !c.updated);
                                 if (missingInfoCards.length > 0) {
-                                    console.log("Could not update cards:", missingInfoCards, "Using card info:", cardInfos);
+                                    hxdec.warning(`Could not update cards: \n ${missingInfoCards}`);
                                 }
                                 callback(cards);
                             }
