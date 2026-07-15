@@ -12,13 +12,6 @@ HXDEC is a "Magic: the Gathering" decklist format. This library is a tool that c
 
 
 
-## Example List
-Here is an example of a full commander decklist in HXDEC format:
-
-
-```http
-hu2cefcu08c17u2c4e5u2c1e0u2c1e1u2c4e7u2dc80u277bu2ce116u12be4u2d314bu08c70u2d6fu25c136u0a02bu128ccu247dau1b925u2d3b8u2e38u2d3155u2b8e1u26db6u27710u28811du18432u2a71au2b111du0246u0fe21u21aa6u28817byd2ec112u2c4efu2b8132u15cb4u204109u2a7157u2da3au2dbe3u29a16cw2ec116u2dcau14312u16b41u2d4dfu0ce102y82ec110u2e24au13722u2a73fcu2a7193u0ce12u2c14fu2d655u2a771u2bd3bu21f33u02414u2dbe7u2a738u29a17du2e268u2c1128u2b8162u2c8f3u2c8f9u2e2100u15e115u2bd1a6u2b1eeu158edu0fe30u2d3a0u21814cu083112u29a158u2d412aku25fd0+Budget Elsha Top+
-```
 ## Capabilities
 The logic in this library has been organized so that you can use it to do more than just create and read HXDEC decklists.
 
@@ -170,6 +163,90 @@ This code will reach out to Scryfall for an individual card set, collector numbe
 When decoding a HXDEC formatted list it will always be necessary to request card data from Scryfall to get the names of the cards as they are not stored in the HXDEC string.
 
 When card data is requested its done in batches with a delay to respect Scryfall rate limits.
+## Explanation of HXDEC Encoding
+HXDEC is based on hexidecimal numbers, its really nothing new. If you are unfamiliar, you've probably seen them used to express colors before and they let you represent a larger number in a smaller number of digits by leveraging letters to count by 16s instead of 10s. Characters 0-9 and a-f are reserved for numbering while other characters can be used to represent deck structure information.
+
+### Example List
+Here is an example of a full commander decklist in HXDEC format:
+
+
+```http
+hu2cefcu08c17u2c4e5u2c1e0u2c1e1u2c4e7u2dc80u277bu2ce116u12be4u2d314bu08c70u2d6fu25c136u0a02bu128ccu247dau1b925u2d3b8u2e38u2d3155u2b8e1u26db6u27710u28811du18432u2a71au2b111du0246u0fe21u21aa6u28817byd2ec112u2c4efu2b8132u15cb4u204109u2a7157u2da3au2dbe3u29a16cw2ec116u2dcau14312u16b41u2d4dfu0ce102y82ec110u2e24au13722u2a73fcu2a7193u0ce12u2c14fu2d655u2a771u2bd3bu21f33u02414u2dbe7u2a738u29a17du2e268u2c1128u2b8162u2c8f3u2c8f9u2e2100u15e115u2bd1a6u2b1eeu158edu0fe30u2d3a0u21814cu083112u29a158u2d412aku25fd0+Budget Elsha Top+
+```
+
+### Parts of a card code
+Each card in a HXDEC list is represented by a code looking something like this:
+
+u25fc0
+
+This code converts to "1 Child of Alara (2X2) 192". Lets break down the parts of the code
+
+#### Character 1: Quantity
+
+**u**25fc0
+
+The quantity is represented by the first character and also serves as the separator between cards.
+
+Characters u, v, w, and x represent quantities 1-4. For quantities 5-15, the character y is used followed by a single hexidecimal number representing the quantity. For quantities above 15, the character z is used followed by a 2-digit hexidecimal number. So in our example code, the quantity is 1 because the first character is "u".
+
+- 1 = u
+- 2 = v
+- 3 = w
+- 4 = x
+- 5 = y5
+- 10 = ya
+- 15 = yf
+- 16 = z10
+- 31 = z1f
+#### Characters 2-4: Set
+u**25f**c0
+
+The next three characters represent the set code. First we assemble every set ever printed, sort them by thier release dates. Then we simply number them, using hexidecimal numbers. This number is padded to always be 3 digits. So the very first set ever printed would be represented by the code "001".
+
+Currently there are just over 1000 sets in Magic the Gathering. Using a 3 digit hexidecimal number allows us to represent up to 4095 sets.
+
+Most set codes are already three characters. However, some are longer or may even include special characters. Representing them with an index like this allows us to reserve characters outside of the hexidecimal range for other purposes and ensures sets released in the future dont break our formatting.
+
+In our example code, the set code is 25f which converts to the set "2X2"
+
+#### Characters 5+: Collector Number
+u25f**c0**
+
+Finally we have the collector number, which is also represented in hexidecimal but is not padded like the "set" code.
+
+Some cards such as those from "The List" (plst) set may have non-numeric collector numbers, for those cases we simply include the original text collector number wrapped in "~" characters. One of these cards might look like this: v20d~TMP-315~ . In our example the collector number is "c0" which is hexidecimal for 192.
+
+Deck Formatting characters
+In addition to the card codes, there are also characters that can be used to represent deck formatting information. These include:
+
+
+
+|Character | Description	| 
+| :-------- | :------- | 
+|h| The start of a HXDEC list and the begining of the Mainboard section of the deck. This should always come first and is the only required section.|
+|k| The begining of the Commanders section of the deck.|
+|s| The begining of the Sideboard section of the deck.|
+|m| The begining of the Maybeboard section of the deck.|
+
+Wrapper characters
+There are also special wrapped values that can be optionally included in the decklist to mantain values mostly used in Archideckt. These values are wrapped in special characters to allow them to be included in the HXDEC string without interfering with the parsing of the card codes and sections. It should be noted that choosing to include these can significantly lengthen an otherwise compact list.
+
+To include a Deck Name use the "+" symbol to wrap the name, and include at the end of the decklist. You may chose to URL encode your deck name.
+
+"Deck Name" is used primarily in Arena format.
+
+These include:
+
+
+| Symbol | Description	| Example | 
+| :-------- | :------- | :------- | 
+| \*…* |	Foil information |	\*F* |
+|^…^	|Tags|	^Buy,#0066ff^|
+|[…]	|Categories|	[Draw, Burn]|
+|\~…~	|Text-based collector numbers|	\~TMP-315~|
+|+…+	|Deck Name|	+My%20Deck+|
+
+Any text that is wrapped in these symbols won't affect the formatting of |the rest of the list. For example, an "s" inside your [spell slinger] Archideckt category won't trigger the start of a sideboard section.
 ## Authors
 
 - [@runeform](https://www.github.com/runeform)
